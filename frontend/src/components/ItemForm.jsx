@@ -14,6 +14,8 @@ export default function ItemForm({ onItemAdded }) {
   const [message, setMessage] = useState({ text: '', type: '' });
   const [loading, setLoading] = useState(false);
 
+  const API_BASE_URL = process.env.REACT_APP_API_URL;
+
   const handleSelectItem = (item) => {
     setSelectedItem(item);
     setFormData(prev => ({
@@ -35,15 +37,14 @@ export default function ItemForm({ onItemAdded }) {
     const payload = {
       name: formData.name,
       type: mode, // 'purchase' or 'sale'
-      // ✅ Use parseFloat instead of parseInt to allow decimals
-      quantity: parseFloat(formData.quantity),
+      quantity: parseFloat(formData.quantity), // ✅ decimals allowed
       unitCostKsh: mode === 'purchase' ? parseFloat(formData.unitCostKsh) : 0,
       unitPriceKsh: mode === 'sale' ? parseFloat(formData.unitPriceKsh) : 0
       // totalKsh is calculated automatically on backend
     };
 
     try {
-      const res = await axios.post('/api/items', payload);
+      const res = await axios.post(`${API_BASE_URL}/items`, payload);
       setMessage({
         text: `✅ ${mode === 'purchase' ? 'Purchase' : 'Sale'} recorded!`,
         type: 'success'
