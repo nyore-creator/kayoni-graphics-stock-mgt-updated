@@ -14,7 +14,8 @@ export default function ItemForm({ onItemAdded }) {
   const [message, setMessage] = useState({ text: '', type: '' });
   const [loading, setLoading] = useState(false);
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL;
+  // ✅ Use Vite environment variable
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
 
   const handleSelectItem = (item) => {
     setSelectedItem(item);

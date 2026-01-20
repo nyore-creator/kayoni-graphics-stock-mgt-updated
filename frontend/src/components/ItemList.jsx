@@ -6,12 +6,15 @@ export default function ItemList({ refreshTrigger }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // ✅ Use Vite environment variable
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
+
   useEffect(() => {
     const fetchItems = async () => {
       setLoading(true);
       setError('');
       try {
-        const res = await axios.get('/api/items');
+        const res = await axios.get(`${API_BASE_URL}/items`);
         setItems(res.data);
       } catch (err) {
         console.error('Failed to fetch items:', err);
@@ -21,7 +24,7 @@ export default function ItemList({ refreshTrigger }) {
       }
     };
     fetchItems();
-  }, [refreshTrigger]);
+  }, [refreshTrigger, API_BASE_URL]);
 
   return (
     <div className="bg-white p-6 rounded-lg shadow mt-6">

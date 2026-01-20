@@ -4,10 +4,6 @@ const cors = require('cors');
 const connectDB = require('./config/db');
 require('dotenv').config();
 
-// Routes
-const itemsRouter = require('./routes/items');
-const reportsRouter = require('./routes/reports');
-
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -18,9 +14,20 @@ app.use(express.json());
 // Connect DB
 connectDB();
 
+// Routers
+const itemsRouter = require('./routes/items');
+const reportsRouter = require('./routes/reports');
+const authRouter = require('./routes/auth');
+
+// ✅ JWT middleware
+const authMiddleware = require('./middleware/authMiddleware');
+
 // Routes
-app.use('/api/items', itemsRouter);
-app.use('/api/reports', reportsRouter);
+app.use('/api/auth', authRouter); // public login route
+
+// ✅ Protect items and reports with JWT
+app.use('/api/items', authMiddleware, itemsRouter);
+app.use('/api/reports', authMiddleware, reportsRouter);
 
 // Health check
 app.get('/', (req, res) => {
@@ -30,6 +37,3 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Backend running on http://localhost:${PORT}`);
 });
-// server.js
-const authRouter = require('./routes/auth');
-app.use('/api/auth', authRouter);

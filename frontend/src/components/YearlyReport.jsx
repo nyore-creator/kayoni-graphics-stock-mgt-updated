@@ -1,13 +1,12 @@
-// frontend/src/components/MonthlyReport.jsx
+// frontend/src/components/YearlyReport.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-export default function MonthlyReport() {
+export default function YearlyReport() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [year, setYear] = useState(new Date().getFullYear());
-  const [month, setMonth] = useState(new Date().getMonth() + 1);
 
   // ✅ Use Vite environment variable
   const API_BASE_URL = import.meta.env.VITE_API_URL;
@@ -17,23 +16,21 @@ export default function MonthlyReport() {
       setLoading(true);
       setError('');
       try {
-        const res = await axios.get(
-          `${API_BASE_URL}/reports/monthly?year=${year}&month=${month}`
-        );
+        const res = await axios.get(`${API_BASE_URL}/reports/yearly?year=${year}`);
         setReport(res.data);
       } catch (err) {
-        console.error('Failed to fetch monthly report:', err);
-        setError('❌ Failed to load monthly report');
+        console.error('Failed to fetch yearly report:', err);
+        setError('❌ Failed to load yearly report');
       } finally {
         setLoading(false);
       }
     };
     fetchReport();
-  }, [year, month, API_BASE_URL]);
+  }, [year, API_BASE_URL]);
 
   return (
     <div className="bg-white p-6 rounded-lg shadow mt-6">
-      <h2 className="text-2xl font-bold mb-4">📊 Monthly Report</h2>
+      <h2 className="text-2xl font-bold mb-4">📊 Yearly Report</h2>
 
       <div className="flex gap-2 mb-4">
         <input
@@ -42,17 +39,6 @@ export default function MonthlyReport() {
           onChange={(e) => setYear(e.target.value)}
           className="p-2 border rounded w-24"
         />
-        <select
-          value={month}
-          onChange={(e) => setMonth(e.target.value)}
-          className="p-2 border rounded"
-        >
-          {Array.from({ length: 12 }, (_, i) => (
-            <option key={i + 1} value={i + 1}>
-              {new Date(0, i).toLocaleString('en-KE', { month: 'long' })}
-            </option>
-          ))}
-        </select>
       </div>
 
       {loading && <p className="text-gray-500">Loading report...</p>}
@@ -61,7 +47,7 @@ export default function MonthlyReport() {
       {report && (
         <>
           <h3 className="text-lg font-semibold mb-2">
-            Period: {report.period.label}
+            Year: {report.period.label}
           </h3>
 
           <table className="w-full border-collapse mb-4">

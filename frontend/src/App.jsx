@@ -3,30 +3,46 @@ import React, { useState } from 'react';
 import WorkerView from './pages/WorkerView';
 import AdminView from './pages/AdminView';
 import { FiUser, FiLock } from 'react-icons/fi';
+import axios from 'axios';
 
 export default function App() {
   const [view, setView] = useState('worker'); // 'worker' | 'admin' | 'login'
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [token, setToken] = useState(null);
+  const [user, setUser] = useState(null);
 
-  const ADMIN_PASSWORD = 'kayoni2026'; // 🔒 Replace with backend auth in production
+  // ✅ Use Vite environment variable for backend API
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    setTimeout(() => {
-      if (password === ADMIN_PASSWORD) {
+    try {
+      const res = await axios.post(`${API_BASE_URL}/auth/login`, {
+        email,
+        password,
+      });
+
+      if (res.data.success) {
+        setToken(res.data.token);
+        setUser(res.data.user);
         setView('admin');
+        setEmail('');
         setPassword('');
       } else {
-        setError('❌ Incorrect password');
-        setPassword('');
+        setError('❌ Invalid credentials');
       }
+    } catch (err) {
+      console.error('Login failed:', err);
+      setError(err.response?.data?.message || '❌ Login failed. Please try again.');
+    } finally {
       setLoading(false);
-    }, 500); // simulate processing delay
+    }
   };
 
   return (
@@ -54,19 +70,27 @@ export default function App() {
 
       <main className="flex-grow py-6">
         {view === 'worker' && <WorkerView />}
-        {view === 'admin' && <AdminView />}
+        {view === 'admin' && <AdminView token={token} user={user} />}
 
         {view === 'login' && (
           <div className="max-w-md mx-auto bg-white p-6 rounded shadow">
             <h2 className="text-xl font-bold mb-4">🔐 Admin Access</h2>
             <form onSubmit={handleLogin}>
               <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter admin email"
+                className="w-full p-2 border rounded mb-2"
+                required
+              />
+              <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter admin password"
                 className="w-full p-2 border rounded mb-2"
-                autoFocus
+                required
               />
               <button
                 type="submit"

@@ -8,10 +8,13 @@ export default function ItemSelector({ onSelect }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // ✅ Use Vite environment variable
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
+
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const res = await axios.get('/api/items');
+        const res = await axios.get(`${API_BASE_URL}/items`);
         setItems(res.data);
       } catch (err) {
         console.error('Failed to fetch items:', err);
@@ -21,7 +24,7 @@ export default function ItemSelector({ onSelect }) {
       }
     };
     fetchItems();
-  }, []);
+  }, [API_BASE_URL]);
 
   useEffect(() => {
     const results = items.filter(item =>
