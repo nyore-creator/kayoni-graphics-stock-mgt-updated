@@ -1,8 +1,13 @@
+// frontend/src/main.jsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+
+// Global styles
 import './index.css';
+
+// Root app + context
 import App from './App.jsx';
-import { AuthProvider } from './context/AuthContext.jsx'; // ✅ import your provider
+import { AuthProvider } from './context/AuthContext.jsx';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

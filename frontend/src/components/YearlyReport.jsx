@@ -18,8 +18,8 @@ export default function YearlyReport() {
         const res = await axios.get(`${API_BASE_URL}/reports/yearly?year=${year}`);
         setReport(res.data);
       } catch (err) {
-        console.error('Failed to fetch yearly report:', err);
-        setError('❌ Failed to load yearly report');
+        console.error('Failed to fetch yearly report:', err.response?.data || err.message);
+        setError(`❌ Failed to load yearly report: ${err.response?.data?.message || err.message}`);
       } finally {
         setLoading(false);
       }
@@ -35,7 +35,7 @@ export default function YearlyReport() {
         <input
           type="number"
           value={year}
-          onChange={(e) => setYear(e.target.value)}
+          onChange={(e) => setYear(Number(e.target.value))}
           className="p-2 border rounded w-24"
         />
       </div>
@@ -49,32 +49,36 @@ export default function YearlyReport() {
             Year: {report.period.label}
           </h3>
 
-          <table className="w-full border-collapse mb-4">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border p-2 text-left">Item</th>
-                <th className="border p-2 text-right">Bought</th>
-                <th className="border p-2 text-right">Sold</th>
-                <th className="border p-2 text-right">Revenue (Ksh)</th>
-                <th className="border p-2 text-right">Cost (Ksh)</th>
-                <th className="border p-2 text-right">Profit (Ksh)</th>
-                <th className="border p-2 text-right">Stock at End</th>
-              </tr>
-            </thead>
-            <tbody>
-              {report.items.map(item => (
-                <tr key={item.name} className="hover:bg-gray-50">
-                  <td className="border p-2">{item.name}</td>
-                  <td className="border p-2 text-right">{item.bought}</td>
-                  <td className="border p-2 text-right">{item.sold}</td>
-                  <td className="border p-2 text-right">{item.revenue.toFixed(2)}</td>
-                  <td className="border p-2 text-right">{item.cost.toFixed(2)}</td>
-                  <td className="border p-2 text-right">{item.profit.toFixed(2)}</td>
-                  <td className="border p-2 text-right">{item.stockAtEnd}</td>
+          {report.items.length === 0 ? (
+            <p className="text-gray-600">No activity recorded for {year}.</p>
+          ) : (
+            <table className="w-full border-collapse mb-4">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="border p-2 text-left">Item</th>
+                  <th className="border p-2 text-right">Bought</th>
+                  <th className="border p-2 text-right">Sold</th>
+                  <th className="border p-2 text-right">Revenue (Ksh)</th>
+                  <th className="border p-2 text-right">Cost (Ksh)</th>
+                  <th className="border p-2 text-right">Profit (Ksh)</th>
+                  <th className="border p-2 text-right">Stock at End</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {report.items.map(item => (
+                  <tr key={item.name} className="hover:bg-gray-50">
+                    <td className="border p-2">{item.name}</td>
+                    <td className="border p-2 text-right">{item.bought}</td>
+                    <td className="border p-2 text-right">{item.sold}</td>
+                    <td className="border p-2 text-right">{item.revenue.toFixed(2)}</td>
+                    <td className="border p-2 text-right">{item.cost.toFixed(2)}</td>
+                    <td className="border p-2 text-right">{item.profit.toFixed(2)}</td>
+                    <td className="border p-2 text-right">{item.stockAtEnd}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
 
           <div className="bg-gray-50 p-4 rounded">
             <h4 className="font-semibold mb-2">Totals</h4>

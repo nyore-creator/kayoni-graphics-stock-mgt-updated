@@ -27,7 +27,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { Line, Bar } from 'react-chartjs-2';
 import { LogOut, Sun, Moon } from 'lucide-react';
-import { DayPicker } from "react-day-picker";
+import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 
 import MonthlyReport from '../components/MonthlyReport';
@@ -42,25 +42,29 @@ export default function AdminView() {
   // Monthly report state
   const [monthlyReport, setMonthlyReport] = useState(null);
   const [loadingMonthly, setLoadingMonthly] = useState(true);
-  const [period, setPeriod] = useState({ 
-    year: new Date().getFullYear(), 
-    month: new Date().getMonth() + 1 
+  const [errorMonthly, setErrorMonthly] = useState('');
+  const [period, setPeriod] = useState({
+    year: new Date().getFullYear(),
+    month: new Date().getMonth() + 1,
   });
 
   // Yearly report state
   const [yearlyReport, setYearlyReport] = useState(null);
   const [loadingYearly, setLoadingYearly] = useState(true);
+  const [errorYearly, setErrorYearly] = useState('');
   const [year, setYear] = useState(new Date().getFullYear());
 
   // Daily logs state
   const [selectedDay, setSelectedDay] = useState(new Date());
   const [dailyLogs, setDailyLogs] = useState([]);
   const [loadingDaily, setLoadingDaily] = useState(true);
+  const [errorDaily, setErrorDaily] = useState('');
 
   // Fetch monthly report
   useEffect(() => {
     const fetchMonthlyReport = async () => {
       setLoadingMonthly(true);
+      setErrorMonthly('');
       try {
         const res = await axios.get(
           `${API_BASE_URL}/reports/monthly?year=${period.year}&month=${period.month}`
@@ -68,6 +72,7 @@ export default function AdminView() {
         setMonthlyReport(res.data);
       } catch (err) {
         console.error('❌ Failed to fetch monthly report:', err);
+        setErrorMonthly('❌ Failed to load monthly report');
       } finally {
         setLoadingMonthly(false);
       }
@@ -79,11 +84,13 @@ export default function AdminView() {
   useEffect(() => {
     const fetchYearlyReport = async () => {
       setLoadingYearly(true);
+      setErrorYearly('');
       try {
         const res = await axios.get(`${API_BASE_URL}/reports/yearly?year=${year}`);
         setYearlyReport(res.data);
       } catch (err) {
         console.error('❌ Failed to fetch yearly report:', err);
+        setErrorYearly('❌ Failed to load yearly report');
       } finally {
         setLoadingYearly(false);
       }
@@ -95,12 +102,14 @@ export default function AdminView() {
   useEffect(() => {
     const fetchDailyLogs = async () => {
       setLoadingDaily(true);
+      setErrorDaily('');
       try {
         const dateStr = selectedDay.toISOString().split('T')[0]; // YYYY-MM-DD
         const res = await axios.get(`${API_BASE_URL}/reports/daily?date=${dateStr}`);
         setDailyLogs(res.data);
       } catch (err) {
         console.error('❌ Failed to fetch daily logs:', err);
+        setErrorDaily('❌ Failed to load daily logs');
       } finally {
         setLoadingDaily(false);
       }
@@ -123,8 +132,8 @@ export default function AdminView() {
         data: [8000, 9000, 10000, 12000],
         borderColor: '#16a34a',
         backgroundColor: 'rgba(22, 163, 74, 0.2)',
-      }
-    ]
+      },
+    ],
   };
 
   return (
@@ -133,14 +142,14 @@ export default function AdminView() {
       <header className="flex justify-between items-center p-4 shadow bg-white dark:bg-gray-800">
         <h1 className="text-2xl font-bold">🛠 Admin Dashboard</h1>
         <div className="flex gap-2">
-          <button 
-            onClick={() => setDarkMode(!darkMode)} 
+          <button
+            onClick={() => setDarkMode(!darkMode)}
             className="px-3 py-2 rounded bg-gray-200 dark:bg-gray-700"
           >
             {darkMode ? <Sun /> : <Moon />}
           </button>
-          <button 
-            onClick={logout} 
+          <button
+            onClick={logout}
             className="px-3 py-2 rounded bg-red-600 text-white flex items-center gap-1"
           >
             <LogOut /> Logout
@@ -164,11 +173,35 @@ export default function AdminView() {
 
         {/* Monthly Report */}
         <div className="bg-white dark:bg-gray-800 p-4 rounded shadow">
-          <h2 className="text-xl font-bold mb-4">📊 Monthly Report</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold">📊 Monthly Report</h2>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={period.year}
+                onChange={(e) => setPeriod((p) => ({ ...p, year: Number(e.target.value) }))}
+                className="p-2 border rounded w-24 dark:bg-gray-700 dark:border-gray-600"
+              />
+              <select
+                value={period.month}
+                onChange={(e) => setPeriod((p) => ({ ...p, month: Number(e.target.value) }))}
+                className="p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+              >
+                {Array.from({ length: 12 }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>
+                    {new Date(0, i).toLocaleString('en-KE', { month: 'long' })}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           {loadingMonthly ? (
             <p>Loading monthly report...</p>
+          ) : errorMonthly ? (
+            <p className="text-red-500">{errorMonthly}</p>
           ) : monthlyReport ? (
-            <MonthlyReport />
+            <MonthlyReport report={monthlyReport} />
           ) : (
             <p>No monthly report available.</p>
           )}
@@ -176,11 +209,22 @@ export default function AdminView() {
 
         {/* Yearly Report */}
         <div className="bg-white dark:bg-gray-800 p-4 rounded shadow">
-          <h2 className="text-xl font-bold mb-4">📆 Yearly Report</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold">📆 Yearly Report</h2>
+            <input
+              type="number"
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value))}
+              className="p-2 border rounded w-24 dark:bg-gray-700 dark:border-gray-600"
+            />
+          </div>
+
           {loadingYearly ? (
             <p>Loading yearly report...</p>
+          ) : errorYearly ? (
+            <p className="text-red-500">{errorYearly}</p>
           ) : yearlyReport ? (
-            <YearlyReport />
+            <YearlyReport report={yearlyReport} />
           ) : (
             <p>No yearly report available.</p>
           )}
@@ -189,17 +233,15 @@ export default function AdminView() {
         {/* Daily Logs */}
         <div className="bg-white dark:bg-gray-800 p-4 rounded shadow">
           <h2 className="text-xl font-bold mb-4">📅 Daily Logs</h2>
-          <DayPicker 
-            mode="single" 
-            selected={selectedDay} 
-            onSelect={setSelectedDay} 
-          />
+          <DayPicker mode="single" selected={selectedDay} onSelect={setSelectedDay} />
           {loadingDaily ? (
             <p className="mt-4">Loading daily logs...</p>
+          ) : errorDaily ? (
+            <p className="mt-4 text-red-500">{errorDaily}</p>
           ) : dailyLogs.length === 0 ? (
             <p className="mt-4">No transactions for {selectedDay.toDateString()}.</p>
           ) : (
-            <table className="w-full border-collapse mt-4">
+            <table className="w-full border-collapse mt-4 text-sm">
               <thead>
                 <tr className="bg-gray-100 dark:bg-gray-700">
                   <th className="border p-2 text-left">Item</th>
@@ -210,13 +252,15 @@ export default function AdminView() {
                 </tr>
               </thead>
               <tbody>
-                {dailyLogs.map(log => (
+                {dailyLogs.map((log) => (
                   <tr key={log._id} className="hover:bg-gray-50 dark:hover:bg-gray-600">
                     <td className="border p-2">{log.name}</td>
                     <td className="border p-2 text-right">{log.isPurchase ? 'Purchase' : 'Sale'}</td>
                     <td className="border p-2 text-right">{log.quantity}</td>
                     <td className="border p-2 text-right">
-                      {log.isPurchase ? log.amountKsh.toFixed(2) : log.unitPriceKsh.toFixed(2)}
+                      {log.isPurchase
+                        ? Number(log.amountKsh).toFixed(2)
+                        : Number(log.unitPriceKsh).toFixed(2)}
                     </td>
                     <td className="border p-2 text-right">
                       {new Date(log.date).toLocaleString()}
