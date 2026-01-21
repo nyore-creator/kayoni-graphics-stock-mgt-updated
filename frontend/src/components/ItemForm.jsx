@@ -4,29 +4,60 @@ import axios from 'axios';
 import ItemSelector from './ItemSelector';
 
 export default function ItemForm({ onItemAdded }) {
-  const [form, setForm] = useState({
+  const [mode, setMode] = useState('purchase'); // 'purchase' or 'sale'
+  const [formData, setFormData] = useState({
     name: '',
-    type: 'purchase', // 'purchase' or 'sale'
-    quantity: 0,
-    unitPriceKsh: 0,
+    quantity: 0.01,
+    unitCostKsh: '',
+    unitPriceKsh: ''
   });
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [message, setMessage] = useState({ text: '', type: '' });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
+  // ✅ Use Vite environment variable
   const API_BASE_URL = import.meta.env.VITE_API_URL;
+
+  const handleSelectItem = (item) => {
+    setSelectedItem(item);
+    setFormData(prev => ({
+      ...prev,
+      name: item.name
+    }));
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setMessage({ text: '', type: '' });
     setLoading(true);
-    setError('');
+
+    const payload = {
+      name: formData.name,
+      type: mode, // 'purchase' or 'sale'
+      quantity: parseFloat(formData.quantity), // ✅ decimals allowed
+      unitCostKsh: mode === 'purchase' ? parseFloat(formData.unitCostKsh) : 0,
+      unitPriceKsh: mode === 'sale' ? parseFloat(formData.unitPriceKsh) : 0
+      // totalKsh is calculated automatically on backend
+    };
 
     try {
-      const res = await axios.post(`${API_BASE_URL}/items`, form);
+      const res = await axios.post(`${API_BASE_URL}/items`, payload);
+      setMessage({
+        text: `✅ ${mode === 'purchase' ? 'Purchase' : 'Sale'} recorded!`,
+        type: 'success'
+      });
       if (onItemAdded) onItemAdded(res.data);
-      setForm({ name: '', type: 'purchase', quantity: 0, unitPriceKsh: 0 });
+      // Reset form
+      setSelectedItem(null);
+      setFormData({ name: '', quantity: 0.01, unitCostKsh: '', unitPriceKsh: '' });
     } catch (err) {
-      console.error('Failed to add item:', err);
-      setError('❌ Failed to add item');
+      const msg = err.response?.data?.message || '❌ Operation failed';
+      setMessage({ text: msg, type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -34,43 +65,124 @@ export default function ItemForm({ onItemAdded }) {
 
   return (
     <div className="bg-white p-6 rounded-lg shadow">
-      <h2 className="text-xl font-bold mb-4">➕ Add Item Transaction</h2>
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <ItemSelector
-          onSelect={(item) => setForm({ ...form, name: item.name })}
-        />
-        <select
-          value={form.type}
-          onChange={(e) => setForm({ ...form, type: e.target.value })}
-          className="w-full p-2 border rounded"
+      <h2 className="text-xl font-bold mb-4">
+        {mode === 'purchase' ? '➕ Add Purchase' : '💰 Record Sale'}
+      </h2>
+
+      <div className="flex gap-2 mb-4">
+        <button
+          type="button"
+          onClick={() => setMode('purchase')}
+          className={`px-4 py-2 rounded ${mode === 'purchase' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
         >
-          <option value="purchase">Purchase</option>
-          <option value="sale">Sale</option>
-        </select>
-        <input
-          type="number"
-          value={form.quantity}
-          onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })}
-          placeholder="Quantity"
-          className="w-full p-2 border rounded"
-        />
-        <input
-          type="number"
-          value={form.unitPriceKsh}
-          onChange={(e) => setForm({ ...form, unitPriceKsh: Number(e.target.value) })}
-          placeholder="Unit Price (Ksh)"
-          className="w-full p-2 border rounded"
-        />
+          Purchase
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('sale')}
+          className={`px-4 py-2 rounded ${mode === 'sale' ? 'bg-green-600 text-white' : 'bg-gray-200'}`}
+        >
+          Sale
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {mode === 'purchase' ? (
+          <div>
+            <label className="block mb-1">Item Name (new or existing)</label>
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              placeholder="e.g., A4 Paper, T-Shirt, Sticker Roll"
+              required
+              className="w-full p-2 border rounded"
+            />
+          </div>
+        ) : (
+          <div>
+            <label className="block mb-1">Select Existing Item</label>
+            <ItemSelector onSelect={handleSelectItem} />
+            {selectedItem && (
+              <p className="text-sm text-gray-600 mt-1">
+                📦 Current stock: <strong>{selectedItem.currentStock}</strong>
+              </p>
+            )}
+            <input type="hidden" name="name" value={formData.name} required />
+          </div>
+        )}
+
+        <div>
+          <label className="block mb-1">Quantity</label>
+          <input
+            type="number"
+            name="quantity"
+            min="0.01"
+            step="0.01"   // ✅ allow decimals like 0.25, 0.5, etc.
+            value={formData.quantity}
+            onChange={handleChange}
+            required
+            className="w-full p-2 border rounded"
+          />
+        </div>
+
+        {mode === 'purchase' ? (
+          <div>
+            <label className="block mb-1">Unit Cost (Ksh)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              name="unitCostKsh"
+              value={formData.unitCostKsh}
+              onChange={handleChange}
+              placeholder="Cost per unit"
+              required
+              className="w-full p-2 border rounded"
+            />
+          </div>
+        ) : (
+          <div>
+            <label className="block mb-1">Selling Price per Unit (Ksh)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              name="unitPriceKsh"
+              value={formData.unitPriceKsh}
+              onChange={handleChange}
+              required
+              className="w-full p-2 border rounded"
+            />
+          </div>
+        )}
+
         <button
           type="submit"
           disabled={loading}
           className={`w-full py-2 rounded text-white ${
-            loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-          }`}
+            mode === 'purchase' ? 'bg-blue-600' : 'bg-green-600'
+          } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
-          {loading ? '⏳ Saving...' : 'Save Transaction'}
+          {loading
+            ? '⏳ Processing...'
+            : mode === 'purchase'
+            ? '➕ Add Purchase'
+            : '💰 Record Sale'}
         </button>
-        {error && <p className="text-red-500 text-center">{error}</p>}
+
+        {message.text && (
+          <div
+            className={`p-2 rounded text-center ${
+              message.type === 'success'
+                ? 'bg-green-100 text-green-800'
+                : 'bg-red-100 text-red-800'
+            }`}
+          >
+            {message.text}
+          </div>
+        )}
       </form>
     </div>
   );

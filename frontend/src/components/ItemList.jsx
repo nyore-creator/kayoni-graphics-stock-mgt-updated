@@ -1,3 +1,4 @@
+// frontend/src/components/ItemList.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
@@ -6,6 +7,7 @@ export default function ItemList({ refreshTrigger }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // ✅ Use Vite environment variable
   const API_BASE_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
@@ -28,11 +30,14 @@ export default function ItemList({ refreshTrigger }) {
   return (
     <div className="bg-white p-6 rounded-lg shadow mt-6">
       <h2 className="text-xl font-bold mb-4">📦 Current Stock & Totals</h2>
+
       {loading && <p className="text-gray-500">Loading items...</p>}
       {error && <p className="text-red-500">{error}</p>}
+
       {!loading && !error && items.length === 0 && (
         <p className="text-gray-600">No items recorded yet.</p>
       )}
+
       {!loading && !error && items.length > 0 && (
         <table className="w-full border-collapse text-sm">
           <thead>
@@ -47,17 +52,36 @@ export default function ItemList({ refreshTrigger }) {
           </thead>
           <tbody>
             {items.map(item => {
-              const lastTx = item.transactions[item.transactions.length - 1];
+              const lastTx =
+                item.transactions && item.transactions.length > 0
+                  ? item.transactions[item.transactions.length - 1]
+                  : null;
               return (
                 <tr key={item._id} className="hover:bg-gray-50">
                   <td className="border p-2">{item.name}</td>
-                  <td className="border p-2 text-right">{item.currentStock}</td>
-                  <td className="border p-2 text-right">{item.amountBoughtKsh?.toLocaleString() || 0}</td>
-                  <td className="border p-2 text-right">{item.amountSoldKsh?.toLocaleString() || 0}</td>
-                  <td className="border p-2 text-right">{item.profitKsh?.toLocaleString() || 0}</td>
+                  <td className="border p-2 text-right">
+                    {parseFloat(item.currentStock).toFixed(2)}
+                  </td>
+                  <td className="border p-2 text-right">
+                    {item.amountBoughtKsh
+                      ? parseFloat(item.amountBoughtKsh).toFixed(2)
+                      : '0.00'}
+                  </td>
+                  <td className="border p-2 text-right">
+                    {item.amountSoldKsh
+                      ? parseFloat(item.amountSoldKsh).toFixed(2)
+                      : '0.00'}
+                  </td>
+                  <td className="border p-2 text-right">
+                    {item.profitKsh
+                      ? parseFloat(item.profitKsh).toFixed(2)
+                      : '0.00'}
+                  </td>
                   <td className="border p-2 text-right">
                     {lastTx
-                      ? `${lastTx.type} of ${lastTx.quantity} on ${new Date(lastTx.date).toLocaleDateString()}`
+                      ? `${lastTx.type} of ${parseFloat(lastTx.quantity).toFixed(
+                          2
+                        )} on ${new Date(lastTx.date).toLocaleDateString()}`
                       : '—'}
                   </td>
                 </tr>
