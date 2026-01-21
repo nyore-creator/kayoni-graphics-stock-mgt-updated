@@ -8,7 +8,6 @@ export default function YearlyReport() {
   const [error, setError] = useState('');
   const [year, setYear] = useState(new Date().getFullYear());
 
-  // ✅ Use Vite environment variable
   const API_BASE_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {

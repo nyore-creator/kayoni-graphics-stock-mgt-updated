@@ -1,3 +1,4 @@
+// frontend/src/pages/AdminView.jsx
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -10,7 +11,6 @@ import {
   Legend,
 } from 'chart.js';
 
-// Register required components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -21,7 +21,7 @@ ChartJS.register(
   Tooltip,
   Legend
 );
-// frontend/src/pages/AdminView.jsx
+
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -31,10 +31,13 @@ import { DayPicker } from "react-day-picker";
 import 'react-day-picker/dist/style.css';
 
 import MonthlyReport from '../components/MonthlyReport';
+import YearlyReport from '../components/YearlyReport';
 
 export default function AdminView() {
   const { logout } = useAuth();
   const [darkMode, setDarkMode] = useState(false);
+
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
 
   // Monthly report state
   const [monthlyReport, setMonthlyReport] = useState(null);
@@ -43,6 +46,11 @@ export default function AdminView() {
     year: new Date().getFullYear(), 
     month: new Date().getMonth() + 1 
   });
+
+  // Yearly report state
+  const [yearlyReport, setYearlyReport] = useState(null);
+  const [loadingYearly, setLoadingYearly] = useState(true);
+  const [year, setYear] = useState(new Date().getFullYear());
 
   // Daily logs state
   const [selectedDay, setSelectedDay] = useState(new Date());
@@ -54,7 +62,9 @@ export default function AdminView() {
     const fetchMonthlyReport = async () => {
       setLoadingMonthly(true);
       try {
-        const res = await axios.get(`/api/reports/monthly?year=${period.year}&month=${period.month}`);
+        const res = await axios.get(
+          `${API_BASE_URL}/reports/monthly?year=${period.year}&month=${period.month}`
+        );
         setMonthlyReport(res.data);
       } catch (err) {
         console.error('❌ Failed to fetch monthly report:', err);
@@ -63,7 +73,23 @@ export default function AdminView() {
       }
     };
     fetchMonthlyReport();
-  }, [period]);
+  }, [period, API_BASE_URL]);
+
+  // Fetch yearly report
+  useEffect(() => {
+    const fetchYearlyReport = async () => {
+      setLoadingYearly(true);
+      try {
+        const res = await axios.get(`${API_BASE_URL}/reports/yearly?year=${year}`);
+        setYearlyReport(res.data);
+      } catch (err) {
+        console.error('❌ Failed to fetch yearly report:', err);
+      } finally {
+        setLoadingYearly(false);
+      }
+    };
+    fetchYearlyReport();
+  }, [year, API_BASE_URL]);
 
   // Fetch daily logs
   useEffect(() => {
@@ -71,7 +97,7 @@ export default function AdminView() {
       setLoadingDaily(true);
       try {
         const dateStr = selectedDay.toISOString().split('T')[0]; // YYYY-MM-DD
-        const res = await axios.get(`/api/reports/daily?date=${dateStr}`);
+        const res = await axios.get(`${API_BASE_URL}/reports/daily?date=${dateStr}`);
         setDailyLogs(res.data);
       } catch (err) {
         console.error('❌ Failed to fetch daily logs:', err);
@@ -80,7 +106,7 @@ export default function AdminView() {
       }
     };
     fetchDailyLogs();
-  }, [selectedDay]);
+  }, [selectedDay, API_BASE_URL]);
 
   // Example chart data (replace with backend data later)
   const chartData = {
@@ -115,7 +141,7 @@ export default function AdminView() {
           </button>
           <button 
             onClick={logout} 
-            className="px-3 py-2 rounded bg-red-600 text-white"
+            className="px-3 py-2 rounded bg-red-600 text-white flex items-center gap-1"
           >
             <LogOut /> Logout
           </button>
@@ -145,6 +171,18 @@ export default function AdminView() {
             <MonthlyReport />
           ) : (
             <p>No monthly report available.</p>
+          )}
+        </div>
+
+        {/* Yearly Report */}
+        <div className="bg-white dark:bg-gray-800 p-4 rounded shadow">
+          <h2 className="text-xl font-bold mb-4">📆 Yearly Report</h2>
+          {loadingYearly ? (
+            <p>Loading yearly report...</p>
+          ) : yearlyReport ? (
+            <YearlyReport />
+          ) : (
+            <p>No yearly report available.</p>
           )}
         </div>
 
