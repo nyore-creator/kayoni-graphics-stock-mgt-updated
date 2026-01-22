@@ -1,6 +1,6 @@
 // frontend/src/context/AuthContext.jsx
 import { createContext, useContext, useState, useEffect } from "react";
-import api from "../utils/axiosInstance"; // ✅ use central axios instance
+import api from "../utils/axiosInstance";
 
 const AuthContext = createContext();
 
@@ -13,10 +13,9 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const token = localStorage.getItem("kayoni_token");
     if (token) {
-      // api instance already attaches token via interceptor
-      setUser({ token }); 
-      // Optional: validate token with backend
-      // api.get("/auth/me").then(res => setUser(res.data)).catch(() => logout());
+      api.get("/auth/me")
+        .then(res => setUser({ ...res.data.user, token }))
+        .catch(() => logout());
     }
     setLoading(false);
   }, []);
@@ -27,9 +26,8 @@ export function AuthProvider({ children }) {
       const { token, user: userData } = res.data;
 
       localStorage.setItem("kayoni_token", token);
-
-      // Store role and other user info
       setUser({ ...userData, token });
+
       return userData;
     } catch (err) {
       console.error("❌ Login failed:", err.response?.data || err.message);
