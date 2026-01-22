@@ -2,6 +2,7 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const authMiddleware = require("../middleware/authMiddleware"); // <-- make sure you have this
 require("dotenv").config();
 
 const router = express.Router();
@@ -45,6 +46,20 @@ router.post("/login", async (req, res) => {
   } catch (err) {
     console.error("Login error:", err.message);
     return res.status(500).json({ message: "Login failed", error: err.message });
+  }
+});
+
+// ✅ NEW: GET /api/auth/me
+router.get("/me", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json({ success: true, user });
+  } catch (err) {
+    console.error("Auth/me error:", err.message);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 
