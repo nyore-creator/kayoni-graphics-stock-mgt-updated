@@ -1,38 +1,35 @@
 // frontend/src/components/ItemSelector.jsx
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect } from "react";
+import api from "../utils/axiosInstance"; // ✅ use central axios instance
 
 export default function ItemSelector({ onSelect }) {
   const [items, setItems] = useState([]);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [filtered, setFiltered] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  // ✅ Use Vite environment variable
-  const API_BASE_URL = import.meta.env.VITE_API_URL;
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/items`);
+        const res = await api.get("/items"); // ✅ token auto-attached
         setItems(res.data);
       } catch (err) {
-        console.error('❌ Failed to fetch items:', err);
-        setError('❌ Failed to load items');
+        console.error("❌ Failed to fetch items:", err);
+        setError("❌ Failed to load items");
       } finally {
         setLoading(false);
       }
     };
     fetchItems();
-  }, [API_BASE_URL]);
+  }, []);
 
   useEffect(() => {
     if (!query) {
       setFiltered([]);
       return;
     }
-    const results = items.filter(item =>
+    const results = items.filter((item) =>
       item.name?.toLowerCase().includes(query.toLowerCase())
     );
     setFiltered(results);
@@ -63,7 +60,7 @@ export default function ItemSelector({ onSelect }) {
           className="absolute z-10 w-full bg-white border mt-1 max-h-48 overflow-auto rounded shadow-lg"
           role="listbox"
         >
-          {filtered.map(item => (
+          {filtered.map((item) => (
             <li
               key={item._id}
               onClick={() => handleSelect(item)}

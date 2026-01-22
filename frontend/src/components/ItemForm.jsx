@@ -1,63 +1,65 @@
 // frontend/src/components/ItemForm.jsx
-import React, { useState } from 'react';
-import axios from 'axios';
-import ItemSelector from './ItemSelector';
+import React, { useState } from "react";
+import api from "../utils/axiosInstance"; // ✅ use central axios instance
+import ItemSelector from "./ItemSelector";
 
 export default function ItemForm({ onItemAdded }) {
-  const [mode, setMode] = useState('purchase'); // 'purchase' or 'sale'
+  const [mode, setMode] = useState("purchase"); // 'purchase' or 'sale'
   const [formData, setFormData] = useState({
-    name: '',
+    name: "",
     quantity: 0.01,
-    unitCostKsh: '',
-    unitPriceKsh: ''
+    unitCostKsh: "",
+    unitPriceKsh: "",
   });
   const [selectedItem, setSelectedItem] = useState(null);
-  const [message, setMessage] = useState({ text: '', type: '' });
+  const [message, setMessage] = useState({ text: "", type: "" });
   const [loading, setLoading] = useState(false);
-
-  // ✅ Use Vite environment variable
-  const API_BASE_URL = import.meta.env.VITE_API_URL;
 
   const handleSelectItem = (item) => {
     setSelectedItem(item);
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      name: item.name
+      name: item.name,
     }));
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage({ text: '', type: '' });
+    setMessage({ text: "", type: "" });
     setLoading(true);
 
     const payload = {
       name: formData.name,
       type: mode, // 'purchase' or 'sale'
-      quantity: parseFloat(formData.quantity), // ✅ decimals allowed
-      unitCostKsh: mode === 'purchase' ? parseFloat(formData.unitCostKsh) : 0,
-      unitPriceKsh: mode === 'sale' ? parseFloat(formData.unitPriceKsh) : 0
-      // totalKsh is calculated automatically on backend
+      quantity: parseFloat(formData.quantity),
+      unitCostKsh: mode === "purchase" ? parseFloat(formData.unitCostKsh) : 0,
+      unitPriceKsh: mode === "sale" ? parseFloat(formData.unitPriceKsh) : 0,
     };
 
     try {
-      const res = await axios.post(`${API_BASE_URL}/items`, payload);
+      const res = await api.post("/items", payload); // ✅ token auto-attached
       setMessage({
-        text: `✅ ${mode === 'purchase' ? 'Purchase' : 'Sale'} recorded!`,
-        type: 'success'
+        text: `✅ ${mode === "purchase" ? "Purchase" : "Sale"} recorded!`,
+        type: "success",
       });
       if (onItemAdded) onItemAdded(res.data);
+
       // Reset form
       setSelectedItem(null);
-      setFormData({ name: '', quantity: 0.01, unitCostKsh: '', unitPriceKsh: '' });
+      setFormData({
+        name: "",
+        quantity: 0.01,
+        unitCostKsh: "",
+        unitPriceKsh: "",
+      });
     } catch (err) {
-      const msg = err.response?.data?.message || '❌ Operation failed';
-      setMessage({ text: msg, type: 'error' });
+      const msg = err.response?.data?.message || "❌ Operation failed";
+      setMessage({ text: msg, type: "error" });
     } finally {
       setLoading(false);
     }
@@ -66,28 +68,32 @@ export default function ItemForm({ onItemAdded }) {
   return (
     <div className="bg-white p-6 rounded-lg shadow">
       <h2 className="text-xl font-bold mb-4">
-        {mode === 'purchase' ? '➕ Add Purchase' : '💰 Record Sale'}
+        {mode === "purchase" ? "➕ Add Purchase" : "💰 Record Sale"}
       </h2>
 
       <div className="flex gap-2 mb-4">
         <button
           type="button"
-          onClick={() => setMode('purchase')}
-          className={`px-4 py-2 rounded ${mode === 'purchase' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+          onClick={() => setMode("purchase")}
+          className={`px-4 py-2 rounded ${
+            mode === "purchase" ? "bg-blue-600 text-white" : "bg-gray-200"
+          }`}
         >
           Purchase
         </button>
         <button
           type="button"
-          onClick={() => setMode('sale')}
-          className={`px-4 py-2 rounded ${mode === 'sale' ? 'bg-green-600 text-white' : 'bg-gray-200'}`}
+          onClick={() => setMode("sale")}
+          className={`px-4 py-2 rounded ${
+            mode === "sale" ? "bg-green-600 text-white" : "bg-gray-200"
+          }`}
         >
           Sale
         </button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {mode === 'purchase' ? (
+        {mode === "purchase" ? (
           <div>
             <label className="block mb-1">Item Name (new or existing)</label>
             <input
@@ -119,7 +125,7 @@ export default function ItemForm({ onItemAdded }) {
             type="number"
             name="quantity"
             min="0.01"
-            step="0.01"   // ✅ allow decimals like 0.25, 0.5, etc.
+            step="0.01"
             value={formData.quantity}
             onChange={handleChange}
             required
@@ -127,7 +133,7 @@ export default function ItemForm({ onItemAdded }) {
           />
         </div>
 
-        {mode === 'purchase' ? (
+        {mode === "purchase" ? (
           <div>
             <label className="block mb-1">Unit Cost (Ksh)</label>
             <input
@@ -162,22 +168,22 @@ export default function ItemForm({ onItemAdded }) {
           type="submit"
           disabled={loading}
           className={`w-full py-2 rounded text-white ${
-            mode === 'purchase' ? 'bg-blue-600' : 'bg-green-600'
-          } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            mode === "purchase" ? "bg-blue-600" : "bg-green-600"
+          } ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           {loading
-            ? '⏳ Processing...'
-            : mode === 'purchase'
-            ? '➕ Add Purchase'
-            : '💰 Record Sale'}
+            ? "⏳ Processing..."
+            : mode === "purchase"
+            ? "➕ Add Purchase"
+            : "💰 Record Sale"}
         </button>
 
         {message.text && (
           <div
             className={`p-2 rounded text-center ${
-              message.type === 'success'
-                ? 'bg-green-100 text-green-800'
-                : 'bg-red-100 text-red-800'
+              message.type === "success"
+                ? "bg-green-100 text-green-800"
+                : "bg-red-100 text-red-800"
             }`}
           >
             {message.text}

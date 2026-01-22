@@ -1,31 +1,30 @@
 // frontend/src/components/YearlyReport.jsx
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect } from "react";
+import api from "../utils/axiosInstance"; // ✅ use central axios instance
 
 export default function YearlyReport() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [year, setYear] = useState(new Date().getFullYear());
-
-  const API_BASE_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     const fetchReport = async () => {
       setLoading(true);
-      setError('');
+      setError("");
       try {
-        const res = await axios.get(`${API_BASE_URL}/reports/yearly?year=${year}`);
+        const res = await api.get(`/reports/yearly?year=${year}`); 
+        // ✅ token auto-attached
         setReport(res.data);
       } catch (err) {
-        console.error('Failed to fetch yearly report:', err.response?.data || err.message);
+        console.error("Failed to fetch yearly report:", err.response?.data || err.message);
         setError(`❌ Failed to load yearly report: ${err.response?.data?.message || err.message}`);
       } finally {
         setLoading(false);
       }
     };
     fetchReport();
-  }, [year, API_BASE_URL]);
+  }, [year]);
 
   return (
     <div className="bg-white p-6 rounded-lg shadow mt-6">
@@ -65,7 +64,7 @@ export default function YearlyReport() {
                 </tr>
               </thead>
               <tbody>
-                {report.items.map(item => (
+                {report.items.map((item) => (
                   <tr key={item.name} className="hover:bg-gray-50">
                     <td className="border p-2">{item.name}</td>
                     <td className="border p-2 text-right">{item.bought}</td>

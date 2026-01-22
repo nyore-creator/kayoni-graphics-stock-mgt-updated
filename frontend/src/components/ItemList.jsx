@@ -1,31 +1,28 @@
 // frontend/src/components/ItemList.jsx
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect } from "react";
+import api from "../utils/axiosInstance"; // ✅ use central axios instance
 
 export default function ItemList({ refreshTrigger }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  // ✅ Use Vite environment variable
-  const API_BASE_URL = import.meta.env.VITE_API_URL;
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const fetchItems = async () => {
       setLoading(true);
-      setError('');
+      setError("");
       try {
-        const res = await axios.get(`${API_BASE_URL}/items`);
+        const res = await api.get("/items"); // ✅ token auto-attached
         setItems(res.data);
       } catch (err) {
-        console.error('Failed to fetch items:', err);
-        setError('❌ Failed to load items');
+        console.error("Failed to fetch items:", err);
+        setError("❌ Failed to load items");
       } finally {
         setLoading(false);
       }
     };
     fetchItems();
-  }, [refreshTrigger, API_BASE_URL]);
+  }, [refreshTrigger]);
 
   return (
     <div className="bg-white p-6 rounded-lg shadow mt-6">
@@ -51,7 +48,7 @@ export default function ItemList({ refreshTrigger }) {
             </tr>
           </thead>
           <tbody>
-            {items.map(item => {
+            {items.map((item) => {
               const lastTx =
                 item.transactions && item.transactions.length > 0
                   ? item.transactions[item.transactions.length - 1]
@@ -65,24 +62,26 @@ export default function ItemList({ refreshTrigger }) {
                   <td className="border p-2 text-right">
                     {item.amountBoughtKsh
                       ? parseFloat(item.amountBoughtKsh).toFixed(2)
-                      : '0.00'}
+                      : "0.00"}
                   </td>
                   <td className="border p-2 text-right">
                     {item.amountSoldKsh
                       ? parseFloat(item.amountSoldKsh).toFixed(2)
-                      : '0.00'}
+                      : "0.00"}
                   </td>
                   <td className="border p-2 text-right">
                     {item.profitKsh
                       ? parseFloat(item.profitKsh).toFixed(2)
-                      : '0.00'}
+                      : "0.00"}
                   </td>
                   <td className="border p-2 text-right">
                     {lastTx
-                      ? `${lastTx.type} of ${parseFloat(lastTx.quantity).toFixed(
-                          2
-                        )} on ${new Date(lastTx.date).toLocaleDateString()}`
-                      : '—'}
+                      ? `${lastTx.type} of ${parseFloat(
+                          lastTx.quantity
+                        ).toFixed(2)} on ${new Date(
+                          lastTx.date
+                        ).toLocaleDateString()}`
+                      : "—"}
                   </td>
                 </tr>
               );

@@ -1,33 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+// frontend/src/components/MonthlyReport.jsx
+import React, { useState, useEffect } from "react";
+import api from "../utils/axiosInstance"; // ✅ use central axios instance
 
 export default function MonthlyReport() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
-
-  const API_BASE_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     const fetchReport = async () => {
       setLoading(true);
-      setError('');
+      setError("");
       try {
-        const res = await axios.get(
-          `${API_BASE_URL}/reports/monthly?year=${year}&month=${month}`
-        );
+        const res = await api.get(`/reports/monthly?year=${year}&month=${month}`); 
+        // ✅ token auto-attached
         setReport(res.data);
       } catch (err) {
-        console.error('Failed to fetch monthly report:', err);
-        setError('❌ Failed to load monthly report');
+        console.error("Failed to fetch monthly report:", err);
+        setError("❌ Failed to load monthly report");
       } finally {
         setLoading(false);
       }
     };
     fetchReport();
-  }, [year, month, API_BASE_URL]);
+  }, [year, month]);
 
   return (
     <div className="bg-white p-6 rounded-lg shadow mt-6">
@@ -46,7 +44,7 @@ export default function MonthlyReport() {
         >
           {Array.from({ length: 12 }, (_, i) => (
             <option key={i + 1} value={i + 1}>
-              {new Date(0, i).toLocaleString('en-KE', { month: 'long' })}
+              {new Date(0, i).toLocaleString("en-KE", { month: "long" })}
             </option>
           ))}
         </select>
@@ -96,19 +94,19 @@ export default function MonthlyReport() {
           <div className="bg-gray-50 p-4 rounded">
             <h4 className="font-semibold mb-2">Totals</h4>
             <p>
-              💰 Total Revenue:{' '}
+              💰 Total Revenue:{" "}
               <strong>{report.totals.totalRevenue.toFixed(2)} Ksh</strong>
             </p>
             <p>
-              📦 Total Cost:{' '}
+              📦 Total Cost:{" "}
               <strong>{report.totals.totalCost.toFixed(2)} Ksh</strong>
             </p>
             <p>
-              📈 Total Profit:{' '}
+              📈 Total Profit:{" "}
               <strong>{report.totals.totalProfit.toFixed(2)} Ksh</strong>
             </p>
             <p>
-              🛒 Items with Activity:{' '}
+              🛒 Items with Activity:{" "}
               <strong>{report.totals.itemsWithActivity}</strong>
             </p>
           </div>
