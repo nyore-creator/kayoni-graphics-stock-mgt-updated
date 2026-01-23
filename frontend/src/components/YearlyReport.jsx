@@ -1,20 +1,20 @@
-// frontend/src/components/YearlyReport.jsx
 import React, { useState, useEffect } from "react";
-import api from "../utils/axiosInstance"; // ✅ use central axios instance
+import api from "../utils/axiosInstance"; // ✅ central axios instance
 
 export default function YearlyReport() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [year, setYear] = useState(new Date().getFullYear());
+  const [downloading, setDownloading] = useState(false);
 
+  // ---------------- FETCH YEARLY REPORT ----------------
   useEffect(() => {
     const fetchReport = async () => {
       setLoading(true);
       setError("");
       try {
-        const res = await api.get(`/reports/yearly?year=${year}`); 
-        // ✅ token auto-attached
+        const res = await api.get(`/reports/yearly?year=${year}`);
         setReport(res.data);
       } catch (err) {
         console.error("Failed to fetch yearly report:", err.response?.data || err.message);
@@ -26,16 +26,56 @@ export default function YearlyReport() {
     fetchReport();
   }, [year]);
 
+  // ---------------- DOWNLOAD PDF ----------------
+  const downloadPDF = async () => {
+    try {
+      setDownloading(true);
+
+      const res = await api.get(`/reports/yearly/pdf?year=${year}`, {
+        responseType: "blob", // 🔑 important for file download
+      });
+
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Yearly_Report_${year}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("PDF download failed:", err.response?.data || err.message);
+      alert("❌ Failed to download PDF report");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="bg-white p-6 rounded-lg shadow mt-6">
-      <h2 className="text-2xl font-bold mb-4">📊 Yearly Report</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-bold">📊 Yearly Report</h2>
+
+        {report && (
+          <button
+            onClick={downloadPDF}
+            disabled={downloading}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-60"
+          >
+            {downloading ? "Generating PDF..." : "📄 Download PDF"}
+          </button>
+        )}
+      </div>
 
       <div className="flex gap-2 mb-4">
         <input
           type="number"
           value={year}
           onChange={(e) => setYear(Number(e.target.value))}
-          className="p-2 border rounded w-24"
+          className="p-2 border rounded w-28"
         />
       </div>
 

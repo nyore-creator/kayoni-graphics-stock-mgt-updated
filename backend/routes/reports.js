@@ -15,11 +15,12 @@ router.get('/summary', async (req, res) => {
 });
 
 // --- Monthly Report ---
-router.get('/monthly', async (req, res) => {
-  const { year = new Date().getFullYear(), month = new Date().getMonth() + 1 } = req.query;
+const { generateReportPDF } = require('../utils/pdfGenerator');
 
+router.get('/monthly/pdf', async (req, res) => {
+  const { year = new Date().getFullYear(), month = new Date().getMonth() + 1 } = req.query;
   const y = parseInt(year);
-  const m = parseInt(month) - 1; // JS months are 0-indexed
+  const m = parseInt(month) - 1;
 
   const start = new Date(y, m, 1);
   const end = new Date(y, m + 1, 0, 23, 59, 59, 999);
@@ -28,15 +29,91 @@ router.get('/monthly', async (req, res) => {
     const items = await Item.find({});
 
     const monthlyData = items.map(item => {
-      const monthTransactions = (item.transactions || []).filter(t =>
-        t.date >= start && t.date <= end
-      );
+      const txs = (item.transactions || []).filter(t => t.date >= start && t.date <= end);
+      const purchases = txs.filter(t => t.type === 'purchase');
+      const sales = txs.filter(t => t.type === 'sale');
 
-      const purchases = monthTransactions.filter(t => t.type === 'purchase');
-      const sales = monthTransactions.filter(t => t.type === 'sale');
+      const bought = purchases.reduce((s, t) => s + (t.quantity || 0), 0);
+      const sold = sales.reduce((s, t) => s + (t.quantity || 0), 0);
+      const cost = purchases.reduce((s, t) => s + (t.totalKsh || 0), 0);
+      const revenue = sales.reduce((s, t) => s + (t.totalKsh || 0), 0);
 
-      const bought = purchases.reduce((sum, t) => sum + (t.quantity || 0), 0);
-      const sold = sales.reduce((sum, t) => sum + (t.quantity || 0), 0);
+      return {
+        name: item.name,
+        bought,
+        sold,
+        revenue,
+        cost,
+        profit: revenue - cost,
+      };
+    });
+
+    const totals = {
+      totalRevenue: monthlyData.reduce((s, i) => s + i.revenue, 0),
+      totalCost: monthlyData.reduce((s, i) => s + i.cost, 0),
+      totalProfit: monthlyData.reduce((s, i) => s + i.profit, 0),
+    };
+
+    generateReportPDF(
+      `Monthly_Report_${year}_${month}`,
+      `${start.toLocaleString('en-KE', { month: 'long', year: 'numeric' })}`,
+      monthlyData,
+      totals,
+      res
+    );
+  } catch (err) {
+    res.status(500).json({ message: '❌ Monthly PDF failed', error: err.message });
+  }
+});
+
+// --- Yearly Report ---
+router.get('/yearly/pdf', async (req, res) => {
+  const { year = new Date().getFullYear() } = req.query;
+  const y = parseInt(year);
+
+  const start = new Date(y, 0, 1);
+  const end = new Date(y, 11, 31, 23, 59, 59, 999);
+
+  try {
+    const items = await Item.find({});
+
+    const yearlyData = items.map(item => {
+      const txs = (item.transactions || []).filter(t => t.date >= start && t.date <= end);
+      const purchases = txs.filter(t => t.type === 'purchase');
+      const sales = txs.filter(t => t.type === 'sale');
+
+      const bought = purchases.reduce((s, t) => s + (t.quantity || 0), 0);
+      const sold = sales.reduce((s, t) => s + (t.quantity || 0), 0);
+      const cost = purchases.reduce((s, t) => s + (t.totalKsh || 0), 0);
+      const revenue = sales.reduce((s, t) => s + (t.totalKsh || 0), 0);
+
+      return {
+        name: item.name,
+        bought,
+        sold,
+        revenue,
+        cost,
+        profit: revenue - cost,
+      };
+    });
+
+    const totals = {
+      totalRevenue: yearlyData.reduce((s, i) => s + i.revenue, 0),
+      totalCost: yearlyData.reduce((s, i) => s + i.cost, 0),
+      totalProfit: yearlyData.reduce((s, i) => s + i.profit, 0),
+    };
+
+    generateReportPDF(
+      `Yearly_Report_${year}`,
+      `${year}`,
+      yearlyData,
+      totals,
+      res
+    );
+  } catch (err) {
+    res.status(500).json({ message: '❌ Yearly PDF failed', error: err.message });
+  }
+});
 
       // Use totalKsh consistently
       const cost = purchases.reduce((sum, t) => sum + (t.totalKsh || 0), 0);
