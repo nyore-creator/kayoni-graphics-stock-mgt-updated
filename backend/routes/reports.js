@@ -20,9 +20,9 @@ const logExport = async (req, type, format = 'summary', params = {}) => {
   }
 };
 
-// --- Helper: Fetch Sales Summary (Aggregated data for charts/tables) ---
+// --- Helper: Fetch Detailed Sales Summary (Groups by Day/Month AND Item Name) ---
 const getSalesSummary = async (start, end, groupBy = 'month') => {
-  const groupFormat = groupBy === 'month' 
+  const timeFormat = groupBy === 'month' 
     ? { month: { $month: "$transactions.date" } } 
     : { day: { $dayOfMonth: "$transactions.date" } };
   
@@ -33,17 +33,24 @@ const getSalesSummary = async (start, end, groupBy = 'month') => {
         "transactions.date": { $gte: start, $lte: end } 
     }},
     { $group: {
-        _id: groupFormat,
+        _id: { 
+          time: timeFormat,
+          name: "$name"
+        },
         revenue: { $sum: "$transactions.totalKsh" },
-        itemsSold: { $sum: "$transactions.quantity" },
-        transactionCount: { $sum: 1 }
+        itemsSold: { $sum: "$transactions.quantity" }
     }},
-    { $sort: { "_id": 1 } }
+    { $project: {
+        _id: "$_id.time",
+        itemName: "$_id.name",
+        revenue: 1,
+        itemsSold: 1
+    }},
+    { $sort: { "_id": 1, "itemName": 1 } }
   ]);
 };
 
-// --- Helper: Process Items Data ---
-// Avoids repeating logic in both JSON and PDF routes
+// --- Helper: Process Items Data (Includes Stock) ---
 const processItemsData = (items, start, end) => {
   return items.map(item => {
     const txs = (item.transactions || []).filter(t => t.date >= start && t.date <= end);
@@ -62,44 +69,72 @@ const processItemsData = (items, start, end) => {
       revenue,
       cost,
       profit: revenue - cost,
-      stockAtEnd: item.stock // current stock reference
+      stockAtEnd: item.stock // ✅ Added to track inventory levels
     };
   });
 };
 
 // =======================
+// DAILY LOGS ROUTE
+// =======================
+router.get('/daily', async (req, res) => {
+  const { date } = req.query;
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+
+  try {
+    const items = await Item.find({ "transactions.date": { $gte: start, $lte: end } });
+    const logs = [];
+    items.forEach(item => {
+      item.transactions
+        .filter(t => t.date >= start && t.date <= end)
+        .forEach(t => {
+          logs.push({
+            itemName: item.name,
+            type: t.type,
+            quantity: t.quantity,
+            totalKsh: t.totalKsh,
+            date: t.date,
+            note: t.note
+          });
+        });
+    });
+    res.json(logs.sort((a, b) => new Date(b.date) - new Date(a.date)));
+  } catch (err) {
+    res.status(500).json({ message: '❌ Daily logs failed', error: err.message });
+  }
+});
+
+// =======================
 // MONTHLY ROUTES
 // =======================
-
-// 1. JSON Data (Fixes the 404 in the UI)
 router.get('/monthly', async (req, res) => {
-  const { year = new Date().getFullYear(), month = new Date().getMonth() + 1 } = req.query;
+  const { year, month } = req.query;
   const start = new Date(parseInt(year), parseInt(month) - 1, 1);
   const end = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
 
   try {
     const items = await Item.find({});
     const monthlyData = processItemsData(items, start, end);
-    const totals = {
-      totalRevenue: monthlyData.reduce((s, i) => s + i.revenue, 0),
-      totalCost: monthlyData.reduce((s, i) => s + i.cost, 0),
-      totalProfit: monthlyData.reduce((s, i) => s + i.profit, 0),
-      itemsWithActivity: monthlyData.filter(i => i.bought > 0 || i.sold > 0).length
-    };
-
     res.json({
       period: { label: start.toLocaleString('en-KE', { month: 'long', year: 'numeric' }) },
       items: monthlyData,
-      totals
+      totals: {
+        totalRevenue: monthlyData.reduce((s, i) => s + i.revenue, 0),
+        totalCost: monthlyData.reduce((s, i) => s + i.cost, 0),
+        totalProfit: monthlyData.reduce((s, i) => s + i.profit, 0),
+        itemsWithActivity: monthlyData.filter(i => i.bought > 0 || i.sold > 0).length
+      }
     });
   } catch (err) {
-    res.status(500).json({ message: '❌ Failed to fetch monthly data', error: err.message });
+    res.status(500).json({ message: '❌ Monthly data failed', error: err.message });
   }
 });
 
-// 2. PDF Download
 router.get('/monthly/pdf', async (req, res) => {
-  const { year = new Date().getFullYear(), month = new Date().getMonth() + 1 } = req.query;
+  const { year, month } = req.query;
   const start = new Date(parseInt(year), parseInt(month) - 1, 1);
   const end = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
 
@@ -109,18 +144,10 @@ router.get('/monthly/pdf', async (req, res) => {
     const monthlyData = processItemsData(items, start, end);
     const totals = {
       totalRevenue: monthlyData.reduce((s, i) => s + i.revenue, 0),
-      totalCost: monthlyData.reduce((s, i) => s + i.cost, 0),
-      totalProfit: monthlyData.reduce((s, i) => s + i.profit, 0)
+      totalCost: monthlyData.reduce((s, i) => s + i.cost, 0)
     };
 
-    generateReportPDF(
-      `Monthly_Report_${year}_${month}`,
-      start.toLocaleString('en-KE', { month: 'long', year: 'numeric' }),
-      monthlyData,
-      totals,
-      salesSummary,
-      res
-    );
+    generateReportPDF(`Monthly_Report_${year}_${month}`, start.toLocaleString('en-KE', { month: 'long', year: 'numeric' }), monthlyData, totals, salesSummary, res);
     await logExport(req, 'pdf', 'monthly', { year, month });
   } catch (err) {
     res.status(500).json({ message: '❌ Monthly PDF failed', error: err.message });
@@ -130,36 +157,31 @@ router.get('/monthly/pdf', async (req, res) => {
 // =======================
 // YEARLY ROUTES
 // =======================
-
-// 1. JSON Data (Fixes the 404 in the UI)
 router.get('/yearly', async (req, res) => {
-  const { year = new Date().getFullYear() } = req.query;
+  const { year } = req.query;
   const start = new Date(parseInt(year), 0, 1);
   const end = new Date(parseInt(year), 11, 31, 23, 59, 59);
 
   try {
     const items = await Item.find({});
     const yearlyData = processItemsData(items, start, end);
-    const totals = {
-      totalRevenue: yearlyData.reduce((s, i) => s + i.revenue, 0),
-      totalCost: yearlyData.reduce((s, i) => s + i.cost, 0),
-      totalProfit: yearlyData.reduce((s, i) => s + i.profit, 0),
-      itemsWithActivity: yearlyData.filter(i => i.bought > 0 || i.sold > 0).length
-    };
-
     res.json({
       period: { label: year.toString() },
       items: yearlyData,
-      totals
+      totals: {
+        totalRevenue: yearlyData.reduce((s, i) => s + i.revenue, 0),
+        totalCost: yearlyData.reduce((s, i) => s + i.cost, 0),
+        totalProfit: yearlyData.reduce((s, i) => s + i.profit, 0),
+        itemsWithActivity: yearlyData.filter(i => i.bought > 0 || i.sold > 0).length
+      }
     });
   } catch (err) {
-    res.status(500).json({ message: '❌ Failed to fetch yearly data', error: err.message });
+    res.status(500).json({ message: '❌ Yearly data failed', error: err.message });
   }
 });
 
-// 2. PDF Download
 router.get('/yearly/pdf', async (req, res) => {
-  const { year = new Date().getFullYear() } = req.query;
+  const { year } = req.query;
   const start = new Date(parseInt(year), 0, 1);
   const end = new Date(parseInt(year), 11, 31, 23, 59, 59);
 
@@ -169,18 +191,10 @@ router.get('/yearly/pdf', async (req, res) => {
     const yearlyData = processItemsData(items, start, end);
     const totals = {
       totalRevenue: yearlyData.reduce((s, i) => s + i.revenue, 0),
-      totalCost: yearlyData.reduce((s, i) => s + i.cost, 0),
-      totalProfit: yearlyData.reduce((s, i) => s + i.profit, 0)
+      totalCost: yearlyData.reduce((s, i) => s + i.cost, 0)
     };
 
-    generateReportPDF(
-      `Yearly_Report_${year}`,
-      year.toString(),
-      yearlyData,
-      totals,
-      salesSummary,
-      res
-    );
+    generateReportPDF(`Yearly_Report_${year}`, year.toString(), yearlyData, totals, salesSummary, res);
     await logExport(req, 'pdf', 'yearly', { year });
   } catch (err) {
     res.status(500).json({ message: '❌ Yearly PDF failed', error: err.message });
