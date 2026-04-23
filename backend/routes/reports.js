@@ -50,7 +50,7 @@ const getSalesSummary = async (start, end, groupBy = 'month') => {
   ]);
 };
 
-// --- Helper: Process Items Data (Includes Stock) ---
+// --- Helper: Process Items Data (CALCULATES LIVE STOCK: Bought - Sold) ---
 const processItemsData = (items, start, end) => {
   return items.map(item => {
     const txs = (item.transactions || []).filter(t => t.date >= start && t.date <= end);
@@ -69,7 +69,8 @@ const processItemsData = (items, start, end) => {
       revenue,
       cost,
       profit: revenue - cost,
-      stockAtEnd: item.stock // ✅ Added to track inventory levels
+      // ✅ FIX: Dynamically calculate stock based on period activity
+      stockAtEnd: bought - sold 
     };
   });
 };
