@@ -50,7 +50,7 @@ const getSalesSummary = async (start, end, groupBy = 'month') => {
   ]);
 };
 
-// --- Helper: Process Items Data (CALCULATES LIVE STOCK: Bought - Sold) ---
+// --- Helper: Process Items Data (Calculates Live Stock & Inventory Value) ---
 const processItemsData = (items, start, end) => {
   return items.map(item => {
     const txs = (item.transactions || []).filter(t => t.date >= start && t.date <= end);
@@ -61,6 +61,14 @@ const processItemsData = (items, start, end) => {
     const sold = sales.reduce((s, t) => s + (t.quantity || 0), 0);
     const cost = purchases.reduce((s, t) => s + (t.totalKsh || 0), 0);
     const revenue = sales.reduce((s, t) => s + (t.totalKsh || 0), 0);
+    
+    // Live Stock Calculation
+    const stockAtEnd = bought - sold;
+    
+    // Calculate buying price per unit to value the remaining stock
+    // Uses the average cost from the current period or the item's base price
+    const unitBuyingPrice = bought > 0 ? (cost / bought) : (item.buyingPrice || 0);
+    const stockValue = stockAtEnd * unitBuyingPrice;
 
     return {
       name: item.name,
@@ -69,8 +77,8 @@ const processItemsData = (items, start, end) => {
       revenue,
       cost,
       profit: revenue - cost,
-      // ✅ FIX: Dynamically calculate stock based on period activity
-      stockAtEnd: bought - sold 
+      stockAtEnd,
+      stockValue
     };
   });
 };
@@ -126,6 +134,7 @@ router.get('/monthly', async (req, res) => {
         totalRevenue: monthlyData.reduce((s, i) => s + i.revenue, 0),
         totalCost: monthlyData.reduce((s, i) => s + i.cost, 0),
         totalProfit: monthlyData.reduce((s, i) => s + i.profit, 0),
+        stockValue: monthlyData.reduce((s, i) => s + (i.stockValue || 0), 0),
         itemsWithActivity: monthlyData.filter(i => i.bought > 0 || i.sold > 0).length
       }
     });
@@ -143,9 +152,11 @@ router.get('/monthly/pdf', async (req, res) => {
     const items = await Item.find({});
     const salesSummary = await getSalesSummary(start, end, 'day');
     const monthlyData = processItemsData(items, start, end);
+    
     const totals = {
       totalRevenue: monthlyData.reduce((s, i) => s + i.revenue, 0),
-      totalCost: monthlyData.reduce((s, i) => s + i.cost, 0)
+      totalCost: monthlyData.reduce((s, i) => s + i.cost, 0),
+      stockValue: monthlyData.reduce((s, i) => s + (i.stockValue || 0), 0)
     };
 
     generateReportPDF(`Monthly_Report_${year}_${month}`, start.toLocaleString('en-KE', { month: 'long', year: 'numeric' }), monthlyData, totals, salesSummary, res);
@@ -173,6 +184,7 @@ router.get('/yearly', async (req, res) => {
         totalRevenue: yearlyData.reduce((s, i) => s + i.revenue, 0),
         totalCost: yearlyData.reduce((s, i) => s + i.cost, 0),
         totalProfit: yearlyData.reduce((s, i) => s + i.profit, 0),
+        stockValue: yearlyData.reduce((s, i) => s + (i.stockValue || 0), 0),
         itemsWithActivity: yearlyData.filter(i => i.bought > 0 || i.sold > 0).length
       }
     });
@@ -190,9 +202,11 @@ router.get('/yearly/pdf', async (req, res) => {
     const items = await Item.find({});
     const salesSummary = await getSalesSummary(start, end, 'month');
     const yearlyData = processItemsData(items, start, end);
+    
     const totals = {
       totalRevenue: yearlyData.reduce((s, i) => s + i.revenue, 0),
-      totalCost: yearlyData.reduce((s, i) => s + i.cost, 0)
+      totalCost: yearlyData.reduce((s, i) => s + i.cost, 0),
+      stockValue: yearlyData.reduce((s, i) => s + (i.stockValue || 0), 0)
     };
 
     generateReportPDF(`Yearly_Report_${year}`, year.toString(), yearlyData, totals, salesSummary, res);
