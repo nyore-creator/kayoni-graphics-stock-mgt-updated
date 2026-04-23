@@ -20,10 +20,11 @@ const logExport = async (req, type, format = 'summary', params = {}) => {
   }
 };
 
-// --- NEW HELPER: Fetch Sales Summary ---
-// This groups all transactions of type 'sale' by month/day
+// --- Helper: Fetch Sales Summary (Aggregated data for charts/tables) ---
 const getSalesSummary = async (start, end, groupBy = 'month') => {
-  const groupFormat = groupBy === 'month' ? { month: { $month: "$transactions.date" } } : { day: { $dayOfMonth: "$transactions.date" } };
+  const groupFormat = groupBy === 'month' 
+    ? { month: { $month: "$transactions.date" } } 
+    : { day: { $dayOfMonth: "$transactions.date" } };
   
   return await Item.aggregate([
     { $unwind: "$transactions" },
@@ -41,119 +42,149 @@ const getSalesSummary = async (start, end, groupBy = 'month') => {
   ]);
 };
 
-// --- Monthly PDF Report (Updated) ---
-router.get('/monthly/pdf', async (req, res) => {
-  const { year = new Date().getFullYear(), month = new Date().getMonth() + 1 } = req.query;
-  const y = parseInt(year);
-  const m = parseInt(month) - 1;
+// --- Helper: Process Items Data ---
+// Avoids repeating logic in both JSON and PDF routes
+const processItemsData = (items, start, end) => {
+  return items.map(item => {
+    const txs = (item.transactions || []).filter(t => t.date >= start && t.date <= end);
+    const purchases = txs.filter(t => t.type === 'purchase');
+    const sales = txs.filter(t => t.type === 'sale');
 
-  const start = new Date(y, m, 1);
-  const end = new Date(y, m + 1, 0, 23, 59, 59, 999);
+    const bought = purchases.reduce((s, t) => s + (t.quantity || 0), 0);
+    const sold = sales.reduce((s, t) => s + (t.quantity || 0), 0);
+    const cost = purchases.reduce((s, t) => s + (t.totalKsh || 0), 0);
+    const revenue = sales.reduce((s, t) => s + (t.totalKsh || 0), 0);
+
+    return {
+      name: item.name,
+      bought,
+      sold,
+      revenue,
+      cost,
+      profit: revenue - cost,
+      stockAtEnd: item.stock // current stock reference
+    };
+  });
+};
+
+// =======================
+// MONTHLY ROUTES
+// =======================
+
+// 1. JSON Data (Fixes the 404 in the UI)
+router.get('/monthly', async (req, res) => {
+  const { year = new Date().getFullYear(), month = new Date().getMonth() + 1 } = req.query;
+  const start = new Date(parseInt(year), parseInt(month) - 1, 1);
+  const end = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
 
   try {
     const items = await Item.find({});
-    
-    // Fetch the daily sales breakdown for this specific month
-    const salesSummary = await getSalesSummary(start, end, 'day');
+    const monthlyData = processItemsData(items, start, end);
+    const totals = {
+      totalRevenue: monthlyData.reduce((s, i) => s + i.revenue, 0),
+      totalCost: monthlyData.reduce((s, i) => s + i.cost, 0),
+      totalProfit: monthlyData.reduce((s, i) => s + i.profit, 0),
+      itemsWithActivity: monthlyData.filter(i => i.bought > 0 || i.sold > 0).length
+    };
 
-    const monthlyData = items.map(item => {
-      const txs = (item.transactions || []).filter(t => t.date >= start && t.date <= end);
-      const purchases = txs.filter(t => t.type === 'purchase');
-      const sales = txs.filter(t => t.type === 'sale');
-
-      const bought = purchases.reduce((s, t) => s + (t.quantity || 0), 0);
-      const sold = sales.reduce((s, t) => s + (t.quantity || 0), 0);
-      const cost = purchases.reduce((s, t) => s + (t.totalKsh || 0), 0);
-      const revenue = sales.reduce((s, t) => s + (t.totalKsh || 0), 0);
-
-      return {
-        name: item.name,
-        bought,
-        sold,
-        revenue,
-        cost,
-        profit: revenue - cost
-      };
+    res.json({
+      period: { label: start.toLocaleString('en-KE', { month: 'long', year: 'numeric' }) },
+      items: monthlyData,
+      totals
     });
+  } catch (err) {
+    res.status(500).json({ message: '❌ Failed to fetch monthly data', error: err.message });
+  }
+});
 
+// 2. PDF Download
+router.get('/monthly/pdf', async (req, res) => {
+  const { year = new Date().getFullYear(), month = new Date().getMonth() + 1 } = req.query;
+  const start = new Date(parseInt(year), parseInt(month) - 1, 1);
+  const end = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+
+  try {
+    const items = await Item.find({});
+    const salesSummary = await getSalesSummary(start, end, 'day');
+    const monthlyData = processItemsData(items, start, end);
     const totals = {
       totalRevenue: monthlyData.reduce((s, i) => s + i.revenue, 0),
       totalCost: monthlyData.reduce((s, i) => s + i.cost, 0),
       totalProfit: monthlyData.reduce((s, i) => s + i.profit, 0)
     };
 
-    // Updated call to include salesSummary
     generateReportPDF(
       `Monthly_Report_${year}_${month}`,
       start.toLocaleString('en-KE', { month: 'long', year: 'numeric' }),
       monthlyData,
       totals,
-      salesSummary, 
+      salesSummary,
       res
     );
-
-    await logExport(req, 'pdf', 'monthly', { year: y, month: m + 1 });
+    await logExport(req, 'pdf', 'monthly', { year, month });
   } catch (err) {
     res.status(500).json({ message: '❌ Monthly PDF failed', error: err.message });
   }
 });
 
-// --- Yearly PDF Report (Updated) ---
-router.get('/yearly/pdf', async (req, res) => {
-  const { year = new Date().getFullYear() } = req.query;
-  const y = parseInt(year);
+// =======================
+// YEARLY ROUTES
+// =======================
 
-  const start = new Date(y, 0, 1);
-  const end = new Date(y, 11, 31, 23, 59, 59, 999);
+// 1. JSON Data (Fixes the 404 in the UI)
+router.get('/yearly', async (req, res) => {
+  const { year = new Date().getFullYear() } = req.query;
+  const start = new Date(parseInt(year), 0, 1);
+  const end = new Date(parseInt(year), 11, 31, 23, 59, 59);
 
   try {
     const items = await Item.find({});
-    
-    // Fetch the monthly sales breakdown for the whole year
-    const salesSummary = await getSalesSummary(start, end, 'month');
+    const yearlyData = processItemsData(items, start, end);
+    const totals = {
+      totalRevenue: yearlyData.reduce((s, i) => s + i.revenue, 0),
+      totalCost: yearlyData.reduce((s, i) => s + i.cost, 0),
+      totalProfit: yearlyData.reduce((s, i) => s + i.profit, 0),
+      itemsWithActivity: yearlyData.filter(i => i.bought > 0 || i.sold > 0).length
+    };
 
-    const yearlyData = items.map(item => {
-      const txs = (item.transactions || []).filter(t => t.date >= start && t.date <= end);
-      const purchases = txs.filter(t => t.type === 'purchase');
-      const sales = txs.filter(t => t.type === 'sale');
-
-      const bought = purchases.reduce((s, t) => s + (t.quantity || 0), 0);
-      const sold = sales.reduce((s, t) => s + (t.quantity || 0), 0);
-      const cost = purchases.reduce((s, t) => s + (t.totalKsh || 0), 0);
-      const revenue = sales.reduce((s, t) => s + (t.totalKsh || 0), 0);
-
-      return {
-        name: item.name,
-        bought,
-        sold,
-        revenue,
-        cost,
-        profit: revenue - cost
-      };
+    res.json({
+      period: { label: year.toString() },
+      items: yearlyData,
+      totals
     });
+  } catch (err) {
+    res.status(500).json({ message: '❌ Failed to fetch yearly data', error: err.message });
+  }
+});
 
+// 2. PDF Download
+router.get('/yearly/pdf', async (req, res) => {
+  const { year = new Date().getFullYear() } = req.query;
+  const start = new Date(parseInt(year), 0, 1);
+  const end = new Date(parseInt(year), 11, 31, 23, 59, 59);
+
+  try {
+    const items = await Item.find({});
+    const salesSummary = await getSalesSummary(start, end, 'month');
+    const yearlyData = processItemsData(items, start, end);
     const totals = {
       totalRevenue: yearlyData.reduce((s, i) => s + i.revenue, 0),
       totalCost: yearlyData.reduce((s, i) => s + i.cost, 0),
       totalProfit: yearlyData.reduce((s, i) => s + i.profit, 0)
     };
 
-    // Updated call to include salesSummary
     generateReportPDF(
       `Yearly_Report_${year}`,
-      `${year}`,
+      year.toString(),
       yearlyData,
       totals,
       salesSummary,
       res
     );
-
-    await logExport(req, 'pdf', 'yearly', { year: y });
+    await logExport(req, 'pdf', 'yearly', { year });
   } catch (err) {
     res.status(500).json({ message: '❌ Yearly PDF failed', error: err.message });
   }
 });
-
-// ... [Keep Summary and Daily Logs as they were or update similarly] ...
 
 module.exports = router;
