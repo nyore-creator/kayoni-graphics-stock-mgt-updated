@@ -3,15 +3,19 @@ const router = express.Router();
 const Item = require('../models/Item');
 const ExportLog = require('../models/ExportLog');
 const { generateReportPDF } = require('../utils/pdfGenerator');
+const mongoose = require('mongoose');
 
 // --- Helper: Log export ---
-const logExport = async (req, type, format = 'summary', params = {}) => {
+const logExport = async (req, type, format = 'pdf', params = {}) => {
   try {
+    // 1. Only assign userId if it's a valid MongoDB ObjectId hex string
+    const isValidObjectId = mongoose.Types.ObjectId.isValid(req.user?.id);
+    
     await ExportLog.create({
-      userId: req.user?.id || 'anonymous',
-      type,
-      format,
-      params,
+      userId: isValidObjectId ? req.user.id : null, // Sets to null instead of breaking MongoDB with "anonymous"
+      type,       // e.g., 'pdf'
+      format,     // Adjusted to match valid file formats or fallback safely
+      params,     // e.g., { year, month } or { scope: 'yearly' }
       ip: req.ip,
       userAgent: req.get('User-Agent')
     });
@@ -66,7 +70,6 @@ const processItemsData = (items, start, end) => {
     const stockAtEnd = bought - sold;
     
     // Calculate buying price per unit to value the remaining stock
-    // Uses the average cost from the current period or the item's base price
     const unitBuyingPrice = bought > 0 ? (cost / bought) : (item.buyingPrice || 0);
     const stockValue = stockAtEnd * unitBuyingPrice;
 
@@ -160,7 +163,9 @@ router.get('/monthly/pdf', async (req, res) => {
     };
 
     generateReportPDF(`Monthly_Report_${year}_${month}`, start.toLocaleString('en-KE', { month: 'long', year: 'numeric' }), monthlyData, totals, salesSummary, res);
-    await logExport(req, 'pdf', 'monthly', { year, month });
+    
+    // Fixed arguments: type is 'monthly_report', format is 'pdf'
+    await logExport(req, 'monthly_report', 'pdf', { year, month });
   } catch (err) {
     res.status(500).json({ message: '❌ Monthly PDF failed', error: err.message });
   }
@@ -210,7 +215,9 @@ router.get('/yearly/pdf', async (req, res) => {
     };
 
     generateReportPDF(`Yearly_Report_${year}`, year.toString(), yearlyData, totals, salesSummary, res);
-    await logExport(req, 'pdf', 'yearly', { year });
+    
+    // Fixed arguments: type is 'yearly_report', format is 'pdf'
+    await logExport(req, 'yearly_report', 'pdf', { year });
   } catch (err) {
     res.status(500).json({ message: '❌ Yearly PDF failed', error: err.message });
   }
