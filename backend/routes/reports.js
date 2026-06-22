@@ -6,16 +6,16 @@ const { generateReportPDF } = require('../utils/pdfGenerator');
 const mongoose = require('mongoose');
 
 // --- Helper: Log export ---
-const logExport = async (req, type, format = 'pdf', params = {}) => {
+const logExport = async (req, type, format = 'summary', params = {}) => {
   try {
-    // 1. Only assign userId if it's a valid MongoDB ObjectId hex string
+    // Check if the incoming user ID is a structurally valid 24-character hex ObjectId
     const isValidObjectId = mongoose.Types.ObjectId.isValid(req.user?.id);
     
     await ExportLog.create({
-      userId: isValidObjectId ? req.user.id : null, // Sets to null instead of breaking MongoDB with "anonymous"
-      type,       // e.g., 'pdf'
-      format,     // Adjusted to match valid file formats or fallback safely
-      params,     // e.g., { year, month } or { scope: 'yearly' }
+      userId: isValidObjectId ? req.user.id : null, // Set to null for guests (requires 'required: false' in model)
+      type,        // Must match schema enum: 'pdf', 'excel', 'csv', 'email'
+      format,      // Must match schema enum: 'summary', 'monthly'
+      params,
       ip: req.ip,
       userAgent: req.get('User-Agent')
     });
@@ -164,8 +164,8 @@ router.get('/monthly/pdf', async (req, res) => {
 
     generateReportPDF(`Monthly_Report_${year}_${month}`, start.toLocaleString('en-KE', { month: 'long', year: 'numeric' }), monthlyData, totals, salesSummary, res);
     
-    // Fixed arguments: type is 'monthly_report', format is 'pdf'
-    await logExport(req, 'monthly_report', 'pdf', { year, month });
+    // ✅ Valid schema alignment: type='pdf' (enum match), format='monthly' (enum match)
+    await logExport(req, 'pdf', 'monthly', { year, month });
   } catch (err) {
     res.status(500).json({ message: '❌ Monthly PDF failed', error: err.message });
   }
@@ -216,8 +216,8 @@ router.get('/yearly/pdf', async (req, res) => {
 
     generateReportPDF(`Yearly_Report_${year}`, year.toString(), yearlyData, totals, salesSummary, res);
     
-    // Fixed arguments: type is 'yearly_report', format is 'pdf'
-    await logExport(req, 'yearly_report', 'pdf', { year });
+    // ✅ Valid schema alignment: type='pdf' (enum match), format='summary' (enum match)
+    await logExport(req, 'pdf', 'summary', { year, scope: 'yearly' });
   } catch (err) {
     res.status(500).json({ message: '❌ Yearly PDF failed', error: err.message });
   }

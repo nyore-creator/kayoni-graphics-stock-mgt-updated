@@ -2,10 +2,11 @@
 const mongoose = require('mongoose');
 
 const exportLogSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  // 1. Changed required to false so guest/anonymous downloads don't crash the server
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false }, 
   type: { type: String, enum: ['pdf', 'excel', 'csv', 'email'], required: true },
   format: { type: String, enum: ['summary', 'monthly'], default: 'summary' },
-  params: { type: Object, default: {} }, // e.g., { year: 2026, month: 1 }
+  params: { type: Object, default: {} }, 
   ip: String,
   userAgent: String
 }, { timestamps: true });
