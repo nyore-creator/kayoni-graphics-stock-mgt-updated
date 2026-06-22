@@ -3,8 +3,11 @@ const PDFDocument = require('pdfkit');
 const generateReportPDF = (fileName, periodLabel, items, totals, salesSummary, res) => {
   const doc = new PDFDocument({ margin: 30, size: 'A4' });
 
+  // Set explicit download and stream binary transfer headers
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename=${fileName}.pdf`);
+  
+  // Pipeline the pdf toolkit output directly into the Express write response stream
   doc.pipe(res);
 
   // --- HEADER ---
@@ -14,7 +17,6 @@ const generateReportPDF = (fileName, periodLabel, items, totals, salesSummary, r
 
   // --- MAIN INVENTORY TABLE (Includes Stock) ---
   const tableTop = 120;
-  // Columns: Item, Bought, Sold, Revenue, Cost, Profit, Stock
   const colWidths = [150, 50, 45, 65, 75, 75, 60]; 
   const headers = ['Item', 'Bought', 'Sold', 'Revenue', 'Cost', 'Profit', 'Stock'];
 
@@ -29,11 +31,9 @@ const generateReportPDF = (fileName, periodLabel, items, totals, salesSummary, r
   let currentY = tableTop + 18;
 
   items.forEach((item) => {
-    // Page break logic
     if (currentY > 750) { 
       doc.addPage(); 
       currentY = 50; 
-      // Redraw headers on new page
       doc.fontSize(10).font('Helvetica-Bold');
       headers.forEach((h, i) => {
         const xPos = 30 + colWidths.slice(0, i).reduce((a, b) => a + b, 0);
@@ -65,7 +65,6 @@ const generateReportPDF = (fileName, periodLabel, items, totals, salesSummary, r
   doc.fontSize(14).font('Helvetica-Bold').text('Detailed Sales Performance Summary', 30, 50);
   doc.moveDown();
 
-  // Determine if we should show "Month" or "Day"
   const isYearly = fileName.toLowerCase().includes('yearly');
   const timeLabel = isYearly ? 'Month' : 'Day';
   const salesHeaders = [timeLabel, 'Item Name', 'Qty Sold', 'Unit Price', 'Total (KSh)'];
@@ -89,14 +88,12 @@ const generateReportPDF = (fileName, periodLabel, items, totals, salesSummary, r
     
     const unitPrice = entry.itemsSold > 0 ? (entry.revenue / entry.itemsSold) : 0;
     
-    // Formatting the Time column
     let timeValue = "";
     if (isYearly && entry._id.month) {
-        // Converts 1 -> January, 2 -> February, etc.
-        const date = new Date(2000, entry._id.month - 1, 1);
-        timeValue = date.toLocaleString('en-KE', { month: 'long' });
+      const date = new Date(2000, entry._id.month - 1, 1);
+      timeValue = date.toLocaleString('en-KE', { month: 'long' });
     } else {
-        timeValue = `Day ${entry._id.day || entry._id.month || 'N/A'}`;
+      timeValue = `Day ${entry._id.day || entry._id.month || 'N/A'}`;
     }
 
     const rowData = [
@@ -116,7 +113,6 @@ const generateReportPDF = (fileName, periodLabel, items, totals, salesSummary, r
 
   // --- FINAL FINANCIAL SUMMARY ---
   doc.moveDown(3);
-  // Re-calculate Y position to prevent overlapping at page bottom
   if (doc.y > 700) doc.addPage();
 
   const netProfit = totals.totalRevenue - totals.totalCost;
@@ -125,14 +121,17 @@ const generateReportPDF = (fileName, periodLabel, items, totals, salesSummary, r
   doc.fontSize(10).font('Helvetica');
   doc.text(`Total Revenue: KSh ${totals.totalRevenue.toLocaleString()}`);
   doc.text(`Total Cost of Purchases: KSh ${totals.totalCost.toLocaleString()}`);
-  
-  // ✅ Added Inventory Valuation
   doc.text(`Current Value of Unsold Stock: KSh ${(totals.stockValue || 0).toLocaleString()}`); 
   
   doc.moveDown(0.5);
   doc.font('Helvetica-Bold').text(`Net Profit/Loss: KSh ${netProfit.toLocaleString()}`, {
     underline: true,
     color: netProfit >= 0 ? 'black' : 'red'
+  });
+
+  // ✅ FIX: Wait for the write stream buffers to fully drain into Express before ending
+  res.on('finish', () => {
+    console.log(`🚀 PDF ${fileName} successfully compiled and flushed to the client.`);
   });
 
   doc.end();
